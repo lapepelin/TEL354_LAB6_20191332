@@ -69,6 +69,34 @@ def get_route(controller_ip, src_dpid, src_port, dst_dpid, dst_port):
         return hops
     return []
 
+def build_route(controller_ip, ruta, mac_src, ip_src, mac_dst, ip_dst, proto_l4, puerto_l4):
+    """
+    Crea los flows necesarios a lo largo de la ruta para permitir tráfico entre src y dst.
+    """
+    for idx, (dpid, in_port) in enumerate(ruta):
+        # Ejemplo genérico
+
+        flow = {
+            "switch": dpid,
+            "name": f"fwd_{mac_src}_{mac_dst}_{puerto_l4}_{idx}",
+            "priority": "40000",
+            "eth_type": "0x0800", # IPv4
+            "ipv4_src": ip_src,
+            "ipv4_dst": ip_dst,
+            "ip_proto": proto_l4,  # 6 para TCP, 17 para UDP
+            "tp_dst": puerto_l4,   # puerto destino
+            "in_port": in_port,
+            "active": "true",
+            "actions": "output=ALL"
+        }
+        url = f"http://{controller_ip}:8080/wm/staticflowpusher/json"
+        resp = requests.post(url, json=flow)
+        if resp.status_code == 200:
+            print(f"Flow instalado en {dpid}:{in_port}")
+        else:
+            print(f"Error instalando flow en {dpid}:{in_port}")
+
+
 def importar_yaml(ruta):
     with open('datos.yaml', 'r') as f:
     data = yaml.safe_load(f)
