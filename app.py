@@ -40,8 +40,18 @@ class Curso:
     def agregar_servidor(self, servidor):    # Método para agregar un servidor al curso
         self.servidores.append(servidor)
 
+class Conexion:
+    def __init__(self, handler, alumno, servidor, servicio, ruta=None):
+        self.handler = handler
+        self.alumno = alumno
+        self.servidor = servidor
+        self.servicio = servicio
+        self.ruta = ruta or []
+
 # Lista global de cursos
 cursos = []
+conexiones = []
+controller_ip = "192.168.200.200"  # Dirección IP del controlador Floodlight
 
 # --- Funciones REST ---
 def get_attachment_points(controller_ip, mac):
@@ -222,13 +232,155 @@ def submenu_alumnos():
             print("Opción inválida.")
 
 def submenu_servidores():
-    pass
+    # Permite listar los servidores y ver detalles de cada uno
+    while True:
+        print("1. Listar")
+        print("2. Mostrar detalle")
+        print("3. Volver")
+        op = input("> ")
+        if op == "1":
+            filtro = input("Filtrar por curso (dejar en blanco para todos): ")
+            encontrados = False
+            for curso in cursos:
+                if filtro and curso.nombre != filtro:
+                    continue
+                for s in curso.servidores:
+                    print(f"{s.nombre} - {s.direccion_ip}")
+                    encontrados = True
+            if not encontrados:
+                print("No hay servidores registrados.")
+        elif op == "2":
+            nombre = input("Nombre del servidor: ")
+            servidor = None
+            for curso in cursos:
+                for s in curso.servidores:
+                    if s.nombre == nombre:
+                        servidor = s
+                        break
+                if servidor:
+                    break
+            if servidor:
+                if servidor.servicios:
+                    print("Servicios:")
+                    for svc in servidor.servicios:
+                        print(f"- {svc.nombre} {svc.protocolo}/{svc.puerto}")
+                else:
+                    print("El servidor no tiene servicios registrados.")
+            else:
+                print("Servidor no encontrado.")
+        elif op == "3":
+            break
+        else:
+            print("Opción inválida.")
 
 def submenu_politicas():
     pass
 
 def submenu_conexiones():
-    pass
+        while True:
+        print("1. Crear")
+        print("2. Listar")
+        print("3. Mostrar detalle")
+        print("4. Recalcular")
+        print("5. Actualizar")
+        print("6. Borrar")
+        print("7. Volver")
+        op = input("> ")
+        if op == "1":
+            curso_nom = input("Curso: ")
+            curso = next((c for c in cursos if c.nombre == curso_nom), None)
+            if not curso:
+                print("Curso no encontrado.")
+                continue
+            if not curso.alumnos:
+                print("El curso no tiene alumnos.")
+                continue
+            for i, a in enumerate(curso.alumnos, 1):
+                print(f"{i}. {a.nombre}")
+            idx = input("Seleccione alumno: ")
+            if not idx.isdigit() or not (1 <= int(idx) <= len(curso.alumnos)):
+                print("Índice inválido.")
+                continue
+            alumno = curso.alumnos[int(idx) - 1]
+            if not curso.servidores:
+                print("El curso no tiene servidores.")
+                continue
+            for i, s in enumerate(curso.servidores, 1):
+                print(f"{i}. {s.nombre}")
+            idx = input("Seleccione servidor: ")
+            if not idx.isdigit() or not (1 <= int(idx) <= len(curso.servidores)):
+                print("Índice inválido.")
+                continue
+            servidor = curso.servidores[int(idx) - 1]
+            if not servidor.servicios:
+                print("El servidor no tiene servicios.")
+                continue
+            for i, svc in enumerate(servidor.servicios, 1):
+                print(f"{i}. {svc.nombre}")
+            idx = input("Seleccione servicio: ")
+            if not idx.isdigit() or not (1 <= int(idx) <= len(servidor.servicios)):
+                print("Índice inválido.")
+                continue
+            servicio = servidor.servicios[int(idx) - 1]
+            ruta = calcular_ruta(alumno, servidor)
+            handler = f"con{len(conexiones)+1}"
+            conexiones.append(Conexion(handler, alumno, servidor, servicio, ruta))
+            print(f"Conexión creada con handler {handler}")
+        elif op == "2":
+            if not conexiones:
+                print("No hay conexiones registradas.")
+            else:
+                for c in conexiones:
+                    print(f"{c.handler}: {c.alumno.nombre} -> {c.servicio.nombre} ({c.servidor.nombre})")
+        elif op == "3":
+            h = input("Handler: ")
+            con = next((c for c in conexiones if c.handler == h), None)
+            if con:
+                if con.ruta:
+                    print("Ruta:")
+                    for dpid, port in con.ruta:
+                        print(f"- {dpid}:{port}")
+                else:
+                    print("Sin ruta")
+            else:
+                print("Conexión no encontrada.")
+        elif op == "4":
+            h = input("Handler: ")
+            con = next((c for c in conexiones if c.handler == h), None)
+            if con:
+                nueva = calcular_ruta(con.alumno, con.servidor)
+                if nueva:
+                    for dpid, port in nueva:
+                        print(f"- {dpid}:{port}")
+                else:
+                    print("No se pudo calcular la ruta.")
+            else:
+                print("Conexión no encontrada.")
+        elif op == "5":
+            h = input("Handler: ")
+            con = next((c for c in conexiones if c.handler == h), None)
+            if con:
+                nueva = calcular_ruta(con.alumno, con.servidor)
+                if nueva:
+                    con.ruta = nueva
+                    print("Ruta actualizada.")
+                else:
+                    print("No se pudo calcular la ruta.")
+            else:
+                print("Conexión no encontrada.")
+        elif op == "6":
+            h = input("Handler: ")
+            for i, c in enumerate(conexiones):
+                if c.handler == h:
+                    del conexiones[i]
+                    print("Conexión eliminada.")
+                    break
+            else:
+                print("Conexión no encontrada.")
+        elif op == "7":
+            break
+        else:
+            print("Opción inválida.")
 
 # --- Menú Principal ---
 def menu_principal():
@@ -264,8 +416,6 @@ def menu_principal():
             print("Opción inválida.")
 
 def main():
-    controller_ip = "192.168.200.200"  # Dirección IP del controlador Floodlight (ajusta según tu red)
-    data = {}    # Diccionario para guardar datos
     menu_principal()
 
 if __name__ == '__main__':
