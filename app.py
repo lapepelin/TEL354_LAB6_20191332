@@ -39,6 +39,9 @@ class Curso:
     def agregar_servidor(self, servidor):
         self.servidores.append(servidor)
 
+# Lista global de cursos
+cursos = []
+
 # --- Funciones REST ---
 def get_attachment_points(controller_ip, mac):
     url = f'http://{controller_ip}:8080/wm/device/'
@@ -82,30 +85,73 @@ def exportar_yaml(ruta):
     
 def submenu_cursos():
     while True:
-        print("1. Crear curso")
-        print("2. Listar cursos")
-        print("3. Mostrar detalle de curso")
-        print("4. Agregar alumno a curso")
-        print("5. Quitar alumno de curso")
-        print("6. Volver")
+        print("1. Listar")
+        print("2. Mostrar detalle")
+        print("3. Actualizar")
+        print("4. Volver")
         op = input("> ")
         if op == "1":
-            # Lógica para crear curso
-            ...
+            if not cursos:
+                print("No hay cursos registrados.")
+            else:
+                for idx, c in enumerate(cursos, 1):
+                    print(f"{idx}. {c.nombre} - {c.estado}")
         elif op == "2":
-            # Lógica para listar
-            ...
-        # y así sucesivamente
-        elif op == "6":
+            nombre = input("Nombre del curso: ")
+            curso = next((c for c in cursos if c.nombre == nombre), None)
+            if curso:
+                print(f"Nombre: {curso.nombre}")
+                print(f"Estado: {curso.estado}")
+                if curso.alumnos:
+                    print("Alumnos:")
+                    for a in curso.alumnos:
+                        print(f"- {a.nombre} ({a.mac})")
+                else:
+                    print("Sin alumnos")
+            else:
+                print("Curso no encontrado.")
+        elif op == "3":
+            nombre = input("Nombre del curso: ")
+            curso = next((c for c in cursos if c.nombre == nombre), None)
+            if not curso:
+                print("Curso no encontrado.")
+                continue
+            print("1. Agregar alumno")
+            print("2. Eliminar alumno")
+            subop = input("> ")
+            if subop == "1":
+                nom = input("Nombre del alumno: ")
+                mac = input("MAC del alumno: ")
+                curso.agregar_alumno(Alumno(nom, mac))
+            elif subop == "2":
+                if not curso.alumnos:
+                    print("No hay alumnos para eliminar.")
+                else:
+                    for i, a in enumerate(curso.alumnos, 1):
+                        print(f"{i}. {a.nombre}")
+                    idx = input("Seleccione alumno: ")
+                    if idx.isdigit() and 1 <= int(idx) <= len(curso.alumnos):
+                        curso.remover_alumno(curso.alumnos[int(idx) - 1])
+                    else:
+                        print("Índice inválido.")
+            else:
+                print("Opción inválida.")
+        elif op == "4":
             break
+        else:
+            print("Opción inválida.")
 
 def submenu_alumnos():
+    pass
 
 def submenu_servidores():
+    pass
 
 def submenu_politicas():
+    pass
 
 def submenu_conexiones():
+    pass
 
 # --- Menú Principal ---
 def menu_principal():
