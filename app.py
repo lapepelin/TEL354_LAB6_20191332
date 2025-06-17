@@ -46,18 +46,22 @@ def get_attachment_points(controller_ip, mac):
     if r.status_code == 200:
         devices = r.json()
         for device in devices:
+            # La MAC puede venir como lista, compara en minúsculas
             if mac.lower() in [m.lower() for m in device.get('mac', [])]:
+                # Algunos hosts pueden tener múltiples attachment points
                 for ap in device.get('attachmentPoint', []):
                     dpid = ap.get('switchDPID')
                     port = ap.get('port')
                     return dpid, port
-    return None, None
+    return None, None # Si no se encuentra
 
 def get_route(controller_ip, src_dpid, src_port, dst_dpid, dst_port):
     url = f'http://{controller_ip}:8080/wm/topology/route/{src_dpid}/{src_port}/{dst_dpid}/{dst_port}/json'
     r = requests.get(url)
     if r.status_code == 200:
+        # La respuesta es una lista de hops (cada hop: switch, puerto)
         route = r.json()
+        # lista de (dpid, puerto)
         hops = [(str(hop['switch']), hop['port']) for hop in route]
         return hops
     return []
