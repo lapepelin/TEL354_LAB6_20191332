@@ -63,28 +63,19 @@ def get_route(controller_ip, src_dpid, src_port, dst_dpid, dst_port):
     return []
 
 def importar_yaml(ruta):
-    with open(ruta, 'r') as f:
-        return yaml.safe_load(f)
-    
-def submenu_cursos():
-    while True:
-        print("1. Crear curso")
-        print("2. Listar cursos")
-        print("3. Mostrar detalle de curso")
-        print("4. Agregar alumno a curso")
-        print("5. Quitar alumno de curso")
-        print("6. Volver")
-        op = input("> ")
-        if op == "1":
-            # Lógica para crear curso
-            ...
-        elif op == "2":
-            # Lógica para listar
-            ...
-        # y así sucesivamente
-        elif op == "6":
-            break
+    with open('datos.yaml', 'r') as f:
+    data = yaml.safe_load(f)
 
+    if 'servidores' in data:
+    print("Nombres de los servidores:")
+        for servidor in data['servidores']:
+            print(servidor['nombre'])
+    else:
+    print("No se encontró la lista de servidores en el archivo YAML.")
+
+def exportar_yaml(ruta):
+    return 0
+    
 def submenu_cursos():
     while True:
         print("1. Crear curso")
@@ -112,6 +103,7 @@ def submenu_politicas():
 
 def submenu_conexiones():
 
+# --- Menú Principal ---
 def menu_principal():
     while True:
         print("1. Importar")
@@ -124,10 +116,10 @@ def menu_principal():
         print("8. Salir")
         op = input("> ")
         if op == "1":
-            importar_yaml
+            importar_yaml()
             ...
         elif op == "2":
-            # Exportar YAML
+            exportar_yaml()
             ...
         elif op == "3":
             submenu_cursos()
@@ -144,7 +136,6 @@ def menu_principal():
         else:
             print("Opción inválida.")
 
-# --- Menú Principal ---
 def main():
     controller_ip = "192.168.200.200"  
     data = {}
