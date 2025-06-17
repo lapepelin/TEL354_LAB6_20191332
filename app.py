@@ -1,11 +1,11 @@
-import yaml
-import requests
+import yaml # Importa la librería para manejar archivos YAML (leer y escribir)
+import requests # Importa la librería para hacer peticiones HTTP (API REST)
 
 # --- Clases ---
 class Alumno:
-    def __init__(self, nombre, mac):
-        self.nombre = nombre
-        self.mac = mac
+    def __init__(self, nombre, mac): # Constructor de la clase Alumno, recibe nombre y MAC
+        self.nombre = nombre         # Asigna el nombre al atributo de instancia
+        self.mac = mac               # Asigna la MAC al atributo de instancia
 
 class Servicio:
     def __init__(self, nombre, protocolo, puerto):
@@ -17,26 +17,26 @@ class Servidor:
     def __init__(self, nombre, direccion_ip):
         self.nombre = nombre
         self.direccion_ip = direccion_ip
-        self.servicios = []
+        self.servicios = []        # Lista de servicios que ofrece el servidor
 
-    def agregar_servicio(self, servicio):
+    def agregar_servicio(self, servicio):    # Método para agregar un servicio al servidor
         self.servicios.append(servicio)
 
 class Curso:
     def __init__(self, nombre, estado):
         self.nombre = nombre
         self.estado = estado
-        self.alumnos = []
-        self.servidores = []
+        self.alumnos = []    # Lista de alumnos inscritos
+        self.servidores = []    # Lista de servidores asociados al curso
 
-    def agregar_alumno(self, alumno):
+    def agregar_alumno(self, alumno):    # Método para agregar un alumno al curso
         self.alumnos.append(alumno)
 
-    def remover_alumno(self, alumno):
+    def remover_alumno(self, alumno):    # Método para remover un alumno del curso
         if alumno in self.alumnos:
             self.alumnos.remove(alumno)
 
-    def agregar_servidor(self, servidor):
+    def agregar_servidor(self, servidor):    # Método para agregar un servidor al curso
         self.servidores.append(servidor)
 
 # Lista global de cursos
@@ -44,30 +44,32 @@ cursos = []
 
 # --- Funciones REST ---
 def get_attachment_points(controller_ip, mac):
-    url = f'http://{controller_ip}:8080/wm/device/'
-    r = requests.get(url)
-    if r.status_code == 200:
-        devices = r.json()
-        for device in devices:
+    # Obtiene el punto de attachment (switch y puerto) para un host por su MAC
+    url = f'http://{controller_ip}:8080/wm/device/'    # Construye la URL de la API
+    r = requests.get(url)    # Hace el request GET a la API
+    if r.status_code == 200:    # Si la respuesta es exitosa
+        devices = r.json()    # Convierte la respuesta en JSON (lista de devices)
+        for device in devices:    # Recorre los dispositivos detectados
             # La MAC puede venir como lista, compara en minúsculas
             if mac.lower() in [m.lower() for m in device.get('mac', [])]:
                 # Algunos hosts pueden tener múltiples attachment points
                 for ap in device.get('attachmentPoint', []):
-                    dpid = ap.get('switchDPID')
-                    port = ap.get('port')
-                    return dpid, port
-    return None, None # Si no se encuentra
+                    dpid = ap.get('switchDPID')    # ID del switch al que está conectado el host
+                    port = ap.get('port')    # Puerto del switch al que está conectado
+                    return dpid, port    # Retorna el DPID y el puerto
+    return None, None # Si no se encuentra, devuelve None
 
 def get_route(controller_ip, src_dpid, src_port, dst_dpid, dst_port):
+    # Obtiene la ruta (lista de switches y puertos) entre dos puntos de la red
     url = f'http://{controller_ip}:8080/wm/topology/route/{src_dpid}/{src_port}/{dst_dpid}/{dst_port}/json'
-    r = requests.get(url)
+    r = requests.get(url)    # Hace el request GET a la API
     if r.status_code == 200:
         # La respuesta es una lista de hops (cada hop: switch, puerto)
-        route = r.json()
+        route = r.json()   
         # lista de (dpid, puerto)
-        hops = [(str(hop['switch']), hop['port']) for hop in route]
-        return hops
-    return []
+        hops = [(str(hop['switch']), hop['port']) for hop in route]    # Arma una lista de tuplas (dpid, puerto)
+        return hops    # Retorna la lista de saltos
+    return []    # Si falla, retorna lista vacía
 
 def build_route(controller_ip, ruta, mac_src, ip_src, mac_dst, ip_dst, proto_l4, puerto_l4):
     """
@@ -98,20 +100,22 @@ def build_route(controller_ip, ruta, mac_src, ip_src, mac_dst, ip_dst, proto_l4,
 
 
 def importar_yaml(ruta):
+    # Lee un archivo YAML y muestra los nombres de los servidores
     with open('datos.yaml', 'r') as f:
-    data = yaml.safe_load(f)
-
-    if 'servidores' in data:
-    print("Nombres de los servidores:")
-        for servidor in data['servidores']:
-            print(servidor['nombre'])
-    else:
-    print("No se encontró la lista de servidores en el archivo YAML.")
+        data = yaml.safe_load(f)    # Carga el contenido YAML como diccionario
+    
+        if 'servidores' in data:    # Si hay una clave "servidores"
+            print("Nombres de los servidores:")
+            for servidor in data['servidores']:    # Recorre la lista de servidores
+                print(servidor['nombre'])    # Imprime el nombre de cada servidor
+        else:
+            print("No se encontró la lista de servidores en el archivo YAML.")
 
 def exportar_yaml(ruta):
-    return 0
+    pass
     
 def submenu_cursos():
+    # Submenú para manejar las operaciones sobre cursos (Listar, Detalle, Actualizar)
     while True:
         print("1. Listar")
         print("2. Mostrar detalle")
@@ -119,14 +123,14 @@ def submenu_cursos():
         print("4. Volver")
         op = input("> ")
         if op == "1":
-            if not cursos:
+            if not cursos:    # Si la lista de cursos está vacía
                 print("No hay cursos registrados.")
             else:
-                for idx, c in enumerate(cursos, 1):
+                for idx, c in enumerate(cursos, 1):    # Imprime la lista de cursos con índice
                     print(f"{idx}. {c.nombre} - {c.estado}")
         elif op == "2":
-            nombre = input("Nombre del curso: ")
-            curso = next((c for c in cursos if c.nombre == nombre), None)
+            nombre = input("Nombre del curso: ")    # Pide el nombre del curso a mostrar
+            curso = next((c for c in cursos if c.nombre == nombre), None)    # Busca el curso por nombre
             if curso:
                 print(f"Nombre: {curso.nombre}")
                 print(f"Estado: {curso.estado}")
@@ -139,7 +143,7 @@ def submenu_cursos():
             else:
                 print("Curso no encontrado.")
         elif op == "3":
-            nombre = input("Nombre del curso: ")
+            nombre = input("Nombre del curso: ")    # Pide el nombre del curso a actualizar
             curso = next((c for c in cursos if c.nombre == nombre), None)
             if not curso:
                 print("Curso no encontrado.")
@@ -148,24 +152,24 @@ def submenu_cursos():
             print("2. Eliminar alumno")
             subop = input("> ")
             if subop == "1":
-                nom = input("Nombre del alumno: ")
+                nom = input("Nombre del alumno: ")     #Pide datos para crear el alumno
                 mac = input("MAC del alumno: ")
-                curso.agregar_alumno(Alumno(nom, mac))
+                curso.agregar_alumno(Alumno(nom, mac))    # Agrega el alumno al curso
             elif subop == "2":
                 if not curso.alumnos:
                     print("No hay alumnos para eliminar.")
                 else:
-                    for i, a in enumerate(curso.alumnos, 1):
+                    for i, a in enumerate(curso.alumnos, 1):    #Lista los alumnos para elegir
                         print(f"{i}. {a.nombre}")
-                    idx = input("Seleccione alumno: ")
+                    idx = input("Seleccione alumno: ")    # Pide el índice del alumno a borrar
                     if idx.isdigit() and 1 <= int(idx) <= len(curso.alumnos):
-                        curso.remover_alumno(curso.alumnos[int(idx) - 1])
+                        curso.remover_alumno(curso.alumnos[int(idx) - 1])    # Remueve al alumno
                     else:
                         print("Índice inválido.")
             else:
                 print("Opción inválida.")
         elif op == "4":
-            break
+            break    # Sale del submenú de cursos
         else:
             print("Opción inválida.")
 
@@ -215,8 +219,8 @@ def menu_principal():
             print("Opción inválida.")
 
 def main():
-    controller_ip = "192.168.200.200"  
-    data = {}
+    controller_ip = "192.168.200.200"  # Dirección IP del controlador Floodlight (ajusta según tu red)
+    data = {}    # Diccionario para guardar datos
     menu_principal()
 
 if __name__ == '__main__':
