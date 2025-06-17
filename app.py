@@ -126,6 +126,50 @@ def exportar_yaml(ruta):
     pass
     
 def submenu_cursos():
+
+    # ...dentro de tu opción "1. Crear" en submenu_conexiones:
+    curso_nom = input("Curso: ")
+    curso = next((c for c in cursos if c.nombre == curso_nom), None)
+    if not curso:
+        print("Curso no encontrado.")
+        continue
+    if curso.estado != "DICTANDO":
+        print("El curso no está activo.")
+        continue
+    # Selección del alumno
+    # ...
+    alumno = curso.alumnos[int(idx) - 1]
+    # Asegúrate que alumno esté en curso.alumnos (ya lo seleccionas de ahí, así que bien)
+    
+    # Selección del servidor
+    # ...
+    servidor = curso.servidores[int(idx) - 1]
+    # Verifica que el servidor está en curso.servidores (también ok porque seleccionas de ahí)
+    
+    # Selección del servicio
+    # ...
+    servicio = servidor.servicios[int(idx) - 1]
+    # Ahora verifica si el servicio está en la lista de servicios permitidos del curso (si tu estructura los maneja así)
+    # Si tienes una lista tipo curso.servicios_permitidos o algo similar, comprueba aquí
+    
+    # Aquí podrías tener una función extra de autorización, pero en tu flujo, si seleccionas todo desde los objetos de curso,
+    # ya se cumple la mayor parte. Pero, SIEMPRE antes de crear la conexión, chequea TODO:
+    
+    if alumno not in curso.alumnos:
+        print("El alumno no está matriculado en este curso.")
+        continue
+    if servidor not in curso.servidores:
+        print("Servidor no permitido en este curso.")
+        continue
+    if servicio not in servidor.servicios:
+        print("Servicio no permitido en este servidor.")
+        continue
+    
+    # Solo aquí creas la conexión
+    handler = f"con{len(conexiones)+1}"
+    conexiones.append(Conexion(handler, alumno, servidor, servicio, ruta))
+    print(f"Conexión creada con handler {handler}")
+    
     # Submenú para manejar las operaciones sobre cursos (Listar, Detalle, Actualizar)
     while True:
         print("1. Listar")
