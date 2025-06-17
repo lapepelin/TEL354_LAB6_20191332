@@ -3,9 +3,10 @@ import requests # Importa la librería para hacer peticiones HTTP (API REST)
 
 # --- Clases ---
 class Alumno:
-    def __init__(self, nombre, mac): # Constructor de la clase Alumno, recibe nombre y MAC
+    def __init__(self, nombre, mac, codigo=None):  # Constructor, ahora admite un código opcional
         self.nombre = nombre         # Asigna el nombre al atributo de instancia
         self.mac = mac               # Asigna la MAC al atributo de instancia
+        self.codigo = codigo         # Código identificador del alumno
 
 class Servicio:
     def __init__(self, nombre, protocolo, puerto):
@@ -152,9 +153,13 @@ def submenu_cursos():
             print("2. Eliminar alumno")
             subop = input("> ")
             if subop == "1":
-                nom = input("Nombre del alumno: ")     #Pide datos para crear el alumno
+                nom = input("Nombre del alumno: ")     # Pide datos para crear el alumno
                 mac = input("MAC del alumno: ")
-                curso.agregar_alumno(Alumno(nom, mac))    # Agrega el alumno al curso
+                codigo = input("Código del alumno (opcional): ")
+                # Agrega el alumno con código si se proporciona
+                if codigo == "":
+                    codigo = None
+                curso.agregar_alumno(Alumno(nom, mac, codigo))
             elif subop == "2":
                 if not curso.alumnos:
                     print("No hay alumnos para eliminar.")
@@ -174,7 +179,47 @@ def submenu_cursos():
             print("Opción inválida.")
 
 def submenu_alumnos():
-    pass
+    # Permite listar alumnos existentes y ver sus detalles
+    while True:
+        print("1. Listar")
+        print("2. Mostrar detalle")
+        print("3. Volver")
+        op = input("> ")
+        if op == "1":
+            filtro = input("Filtrar por curso (dejar en blanco para todos): ")
+            encontrados = False
+            for curso in cursos:
+                if filtro and curso.nombre != filtro:
+                    continue
+                for a in curso.alumnos:
+                    codigo = getattr(a, "codigo", None)
+                    cod_str = codigo if codigo is not None else "N/A"
+                    print(f"{cod_str} - {a.nombre} ({a.mac})")
+                    encontrados = True
+            if not encontrados:
+                print("No hay alumnos registrados.")
+        elif op == "2":
+            nombre = input("Nombre del alumno: ")
+            alumno = None
+            for curso in cursos:
+                for a in curso.alumnos:
+                    if a.nombre == nombre:
+                        alumno = a
+                        break
+                if alumno:
+                    break
+            if alumno:
+                codigo = getattr(alumno, "codigo", None)
+                cod_str = codigo if codigo is not None else "N/A"
+                print(f"Código: {cod_str}")
+                print(f"Nombre: {alumno.nombre}")
+                print(f"MAC: {alumno.mac}")
+            else:
+                print("Alumno no encontrado.")
+        elif op == "3":
+            break
+        else:
+            print("Opción inválida.")
 
 def submenu_servidores():
     pass
