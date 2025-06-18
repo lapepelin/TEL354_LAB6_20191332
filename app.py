@@ -7,6 +7,11 @@ class Alumno:
         self.nombre = nombre         # Asigna el nombre al atributo de instancia
         self.mac = mac               # Asigna la MAC al atributo de instancia
         self.codigo = codigo         # Código identificador del alumno
+        self.autorizado = autorizado # Indica si el alumno está autorizado
+
+    def esta_autorizado(self):
+        """Devuelve True si el alumno está autorizado."""
+        return self.autorizado
 
 class Servicio:
     def __init__(self, nombre, protocolo, puerto):
@@ -321,7 +326,7 @@ def submenu_politicas():
     pass
 
 def submenu_conexiones():
-        while True:
+    while True:
         print("1. Crear")
         print("2. Listar")
         print("3. Mostrar detalle")
@@ -346,6 +351,9 @@ def submenu_conexiones():
                 print("Índice inválido.")
                 continue
             alumno = curso.alumnos[int(idx) - 1]
+            if not alumno.esta_autorizado():
+                print("El alumno no está autorizado para crear conexiones.")
+                continue
             if not curso.servidores:
                 print("El curso no tiene servidores.")
                 continue
@@ -435,6 +443,9 @@ def submenu_conexiones():
             h = input("Handler: ")
             for i, c in enumerate(conexiones):
                 if c.handler == h:
+                    if not c.alumno.esta_autorizado():
+                        print("El alumno no está autorizado para eliminar esta conexion.")
+                        break
                     del conexiones[i]
                     print("Conexión eliminada.")
                     break
