@@ -116,16 +116,43 @@ def build_route(controller_ip, ruta, mac_src, ip_src, mac_dst, ip_dst, proto_l4,
 
 
 def importar_yaml(ruta):
-    # Lee un archivo YAML y muestra los nombres de los servidores
-    with open('datos.yaml', 'r') as f:
-        data = yaml.safe_load(f)    # Carga el contenido YAML como diccionario
-    
-        if 'servidores' in data:    # Si hay una clave "servidores"
-            print("Nombres de los servidores:")
-            for servidor in data['servidores']:    # Recorre la lista de servidores
-                print(servidor['nombre'])    # Imprime el nombre de cada servidor
-        else:
-            print("No se encontró la lista de servidores en el archivo YAML.")
+    global cursos
+    with open(ruta, 'r') as f:
+        data = yaml.safe_load(f)
+
+    alumnos_dict = {}
+    if 'alumnos' in data:
+        for a in data['alumnos']:
+            alumnos_dict[a['codigo']] = Alumno(a['nombre'], a['mac'], a['codigo'])
+
+    servidores_dict = {}
+    if 'servidores' in data:
+        for s in data['servidores']:
+            srv = Servidor(s['nombre'], s['direccion_ip'])
+            srv.mac = s.get('mac', None)
+            for svc in s.get('servicios', []):
+                srv.agregar_servicio(Servicio(svc['nombre'], svc['protocolo'], svc['puerto']))
+            servidores_dict[s['nombre']] = srv
+
+    cursos.clear()
+    if 'cursos' in data:
+        for c in data['cursos']:
+            curso = Curso(c['nombre'], c['estado'])
+            # Asocia alumnos
+            for cod in c.get('alumnos', []):
+                if cod in alumnos_dict:
+                    curso.agregar_alumno(alumnos_dict[cod])
+            # Asocia servidores y filtra servicios permitidos
+            for srv_obj in c.get('servidores', []):
+                srv = servidores_dict.get(srv_obj['nombre'])
+                if srv:
+                    # Si tienes "servicios_permitidos", crea una nueva lista solo con esos servicios
+                    if 'servicios_permitidos' in srv_obj:
+                        nuevos_servicios = [s for s in srv.servicios if s.nombre in srv_obj['servicios_permitidos']]
+                        srv.servicios = nuevos_servicios
+                    curso.agregar_servidor(srv)
+            cursos.append(curso)
+    print("Datos importados correctamente.")
 
 def exportar_yaml(ruta):
     pass
@@ -470,6 +497,8 @@ def menu():
         op = input("> ")
         if op == "1":
             importar_yaml()
+            ruta = input("Archivo YAML a importar: ")
+            importar_yaml(ruta)
         elif op == "2":
             exportar_yaml()
         elif op == "3":
