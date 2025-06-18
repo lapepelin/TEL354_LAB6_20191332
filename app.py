@@ -365,8 +365,27 @@ def submenu_conexiones():
             if not idx.isdigit() or not (1 <= int(idx) <= len(servidor.servicios)):
                 print("Índice inválido.")
                 continue
-            servicio = servidor.servicios[int(idx) - 1]
-            ruta = calcular_ruta(alumno, servidor)
+                
+            # OBTÉN EL PUNTO DE ATTACHMENT DEL ALUMNO Y DEL SERVIDOR
+            dpid_src, port_src = get_attachment_points(controller_ip, alumno.mac)
+            dpid_dst, port_dst = get_attachment_points(controller_ip, servidor.mac) # Ojo: servidor.mac debe existir
+
+            if not dpid_src or not dpid_dst:
+                print("No se pudo encontrar el punto de attachment para el host o servidor.")
+                continue
+
+            # CALCULA LA RUTA ENTRE AMBOS
+            ruta = get_route(controller_ip, dpid_src, port_src, dpid_dst, port_dst)
+
+            if not ruta:
+                print("No se encontró una ruta válida entre el alumno y el servidor.")
+                continue
+
+            # INSTALA LOS FLOWS EN LA RED (AMBOS SENTIDOS)
+            proto_l4 = 6 if servicio.protocolo.upper() == "TCP" else 17
+            build_route(controller_ip, ruta, alumno.mac, "IP_DEL_ALUMNO", servidor.mac, servidor.direccion_ip, proto_l4, servicio.puerto)
+
+            # CREA LA CONEXIÓN EN EL SISTEMA
             handler = f"con{len(conexiones)+1}"
             conexiones.append(Conexion(handler, alumno, servidor, servicio, ruta))
             print(f"Conexión creada con handler {handler}")
@@ -427,7 +446,7 @@ def submenu_conexiones():
             print("Opción inválida.")
 
 # --- Menú Principal ---
-def menu_principal():
+def menu():
     while True:
         print("1. Importar")
         print("2. Exportar")
@@ -460,7 +479,7 @@ def menu_principal():
             print("Opción inválida.")
 
 def main():
-    menu_principal()
+    menu()
 
 if __name__ == '__main__':
     main()
