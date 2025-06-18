@@ -459,10 +459,8 @@ def menu():
         op = input("> ")
         if op == "1":
             importar_yaml()
-            ...
         elif op == "2":
             exportar_yaml()
-            ...
         elif op == "3":
             submenu_cursos()
         elif op == "4":
