@@ -196,25 +196,54 @@ def calcular_ruta(alumno, servidor):
     return get_route(controller_ip, dpid_src, port_src, dpid_dst, port_dst)
 
 def importar_yaml(ruta):
+    """Carga cursos, alumnos y servidores desde un YAML.
+
+    Formato esperado:
+    alumnos:
+      - nombre: str
+        codigo: str
+        mac: str
+        ip: str (opcional)
+        autorizado: bool (opcional)
+    servidores:
+      - nombre: str
+        direccion_ip o ip: str
+        mac: str (opcional)
+        servicios:
+          - nombre: str
+            protocolo: str
+            puerto: int
+    cursos:
+      - nombre: str
+        estado: str
+        alumnos: [codigo_alumno, ...]
+        servidores:
+          - nombre: str
+            servicios_permitidos: [nombre_servicio, ...]
+    """
     global cursos
-    with open(ruta, 'r') as f:
+    with open(ruta, "r") as f:
         data = yaml.safe_load(f)
 
     alumnos_dict = {}
     if 'alumnos' in data:
         for a in data['alumnos']:
             alumnos_dict[a['codigo']] = Alumno(
-                autoriz = a.get('autorizado', False)
                 a['nombre'],
-                a['codigo'],
                 a['mac'],
-                a.get('ip')
+                codigo=a['codigo'],
+                ip=a.get('ip'),
+                autorizado=a.get('autorizado', False)
             )
+
 
     servidores_dict = {}
     if 'servidores' in data:
         for s in data['servidores']:
-            srv = Servidor(s['nombre'], s['direccion_ip'], s.get('mac', None))
+            direccion = s.get('direccion_ip') or s.get('ip')
+            if direccion is None:
+                raise KeyError("Falta 'direccion_ip' o 'ip' en servidor")
+            srv = Servidor(s['nombre'], direccion, s.get('mac'))
             for svc in s.get('servicios', []):
                 srv.agregar_servicio(Servicio(svc['nombre'], svc['protocolo'], svc['puerto']))
             servidores_dict[s['nombre']] = srv
@@ -472,14 +501,18 @@ def submenu_conexiones():
                 print("No se pudo determinar la IP del alumno.")
                 continue
 
+            # L4 source port is set to 0 to match any source port
             build_route(
                 controller_ip,
                 ruta,
+                port_src,
+                port_dst,
                 alumno.mac,
                 ip_src,
                 servidor.mac,
                 servidor.direccion_ip,
                 proto_l4,
+                0,
                 servicio.puerto
             )
 
