@@ -1,5 +1,6 @@
 import yaml # Importa la librería para manejar archivos YAML (leer y escribir)
 import requests # Importa la librería para hacer peticiones HTTP (API REST)
+import sys  # Para manejar argumentos de línea de comandos
 
 # --- Clases ---
 class Alumno:
@@ -113,7 +114,16 @@ def build_route(controller_ip, ruta, mac_src, ip_src, mac_dst, ip_dst, proto_l4,
             print(f"Flow instalado en {dpid}:{in_port}")
         else:
             print(f"Error instalando flow en {dpid}:{in_port}")
+            
+def calcular_ruta(alumno, servidor):
+    """Obtiene la ruta actual entre un alumno y un servidor."""
+    dpid_src, port_src = get_attachment_points(controller_ip, alumno.mac)
+    dpid_dst, port_dst = get_attachment_points(controller_ip, servidor.mac)
 
+    if not dpid_src or not dpid_dst:
+        return []
+
+    return get_route(controller_ip, dpid_src, port_src, dpid_dst, port_dst)
 
 def importar_yaml(ruta):
     global cursos
@@ -401,6 +411,8 @@ def submenu_conexiones():
                 print("Índice inválido.")
                 continue
                 
+            servicio = servidor.servicios[int(idx) - 1]
+            
             # OBTÉN EL PUNTO DE ATTACHMENT DEL ALUMNO Y DEL SERVIDOR
             dpid_src, port_src = get_attachment_points(controller_ip, alumno.mac)
             dpid_dst, port_dst = get_attachment_points(controller_ip, servidor.mac) # Ojo: servidor.mac debe existir
@@ -496,7 +508,6 @@ def menu():
         print("8. Salir")
         op = input("> ")
         if op == "1":
-            importar_yaml()
             ruta = input("Archivo YAML a importar: ")
             importar_yaml(ruta)
         elif op == "2":
@@ -517,6 +528,23 @@ def menu():
             print("Opción inválida.")
 
 def main():
+
+    """Carga opcionalmente un archivo YAML y luego inicia el menú."""
+    ruta = None
+    # Si se pasa una ruta como argumento, úsala; de lo contrario pregunta al usuario
+    if len(sys.argv) > 1:
+        ruta = sys.argv[1]
+    else:
+        ruta = input(
+            "Archivo YAML inicial (dejar vacío para continuar sin importar): "
+        ).strip()
+
+    if ruta:
+        try:
+            importar_yaml(ruta)
+        except Exception as exc:
+            print(f"Error al importar '{ruta}': {exc}")
+    
     menu()
 
 if __name__ == '__main__':
