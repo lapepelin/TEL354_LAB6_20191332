@@ -4,11 +4,14 @@ import sys  # Para manejar argumentos de línea de comandos
 
 # --- Clases ---
 class Alumno:
-    def __init__(self, nombre, mac, codigo=None):  # Constructor, ahora admite un código opcional
-        self.nombre = nombre         # Asigna el nombre al atributo de instancia
-        self.mac = mac               # Asigna la MAC al atributo de instancia
-        self.codigo = codigo         # Código identificador del alumno
-        self.autorizado = autorizado # Indica si el alumno está autorizado
+    def __init__(self, nombre, mac, codigo=None, ip=None, autorizado=False): # Constructor admite código y flag de autorización opcionales
+        """Representa a un alumno de un curso."""
+
+        self.nombre = nombre
+        self.mac = mac
+        self.codigo = codigo
+        self.ip = ip
+        self.autorizado = autorizado
 
     def esta_autorizado(self):
         """Devuelve True si el alumno está autorizado."""
@@ -21,9 +24,10 @@ class Servicio:
         self.puerto = puerto
 
 class Servidor:
-    def __init__(self, nombre, direccion_ip):
+    def __init__(self, nombre, direccion_ip, mac=None):
         self.nombre = nombre
         self.direccion_ip = direccion_ip
+        self.mac = mac
         self.servicios = []        # Lista de servicios que ofrece el servidor
 
     def agregar_servicio(self, servicio):    # Método para agregar un servicio al servidor
@@ -88,32 +92,92 @@ def get_route(controller_ip, src_dpid, src_port, dst_dpid, dst_port):
         return hops    # Retorna la lista de saltos
     return []    # Si falla, retorna lista vacía
 
-def build_route(controller_ip, ruta, mac_src, ip_src, mac_dst, ip_dst, proto_l4, puerto_l4):
-    """
-    Crea los flows necesarios a lo largo de la ruta para permitir tráfico entre src y dst.
-    """
-    for idx, (dpid, in_port) in enumerate(ruta):
-        # Ejemplo genérico
+def build_route(controller_ip, ruta, port_src, port_dst, mac_src, ip_src, mac_dst,
+                ip_dst, proto_l4, l4_src, l4_dst):
+    """Instala flows en ambos sentidos para la ruta dada."""
+    if not ruta:
+        return
 
-        flow = {
+    url = f"http://{controller_ip}:8080/wm/staticflowpusher/json"
+
+    # Calcula la lista de hops con (dpid, in_port, out_port)
+    hops = []
+    hops.append((ruta[0][0], port_src, ruta[0][1]))
+    for i in range(1, len(ruta) - 1, 2):
+        if i + 1 >= len(ruta):
+            break
+        dpid_in, in_port = ruta[i]
+        dpid_out, out_port = ruta[i + 1]
+        if dpid_in == dpid_out:
+            hops.append((dpid_in, in_port, out_port))
+    hops.append((ruta[-1][0], ruta[-1][1], port_dst))
+
+    for idx, (dpid, in_p, out_p) in enumerate(hops):
+        base = {
             "switch": dpid,
-            "name": f"fwd_{mac_src}_{mac_dst}_{puerto_l4}_{idx}",
             "priority": "40000",
-            "eth_type": "0x0800", # IPv4
+            "active": "true",
+        }
+
+        fwd = base | {
+            "name": f"fwd_{idx}_{mac_src}_{mac_dst}",
+            "eth_type": "0x0800",
+            "eth_src": mac_src,
+            "eth_dst": mac_dst,
             "ipv4_src": ip_src,
             "ipv4_dst": ip_dst,
-            "ip_proto": proto_l4,  # 6 para TCP, 17 para UDP
-            "tp_dst": puerto_l4,   # puerto destino
-            "in_port": in_port,
-            "active": "true",
-            "actions": "output=ALL"
+            "ip_proto": proto_l4,
+            "tp_src": l4_src,
+            "tp_dst": l4_dst,
+            "in_port": in_p,
+            "actions": f"output={out_p}",
         }
-        url = f"http://{controller_ip}:8080/wm/staticflowpusher/json"
-        resp = requests.post(url, json=flow)
-        if resp.status_code == 200:
-            print(f"Flow instalado en {dpid}:{in_port}")
-        else:
-            print(f"Error instalando flow en {dpid}:{in_port}")
+        rev = base | {
+            "name": f"rev_{idx}_{mac_dst}_{mac_src}",
+            "eth_type": "0x0800",
+            "eth_src": mac_dst,
+            "eth_dst": mac_src,
+            "ipv4_src": ip_dst,
+            "ipv4_dst": ip_src,
+            "ip_proto": proto_l4,
+            "tp_src": l4_dst,
+            "tp_dst": l4_src,
+            "in_port": out_p,
+            "actions": f"output={in_p}",
+        }
+
+        arp_fwd = base | {
+            "name": f"arp_fwd_{idx}_{mac_src}_{mac_dst}",
+            "eth_type": "0x0806",
+            "in_port": in_p,
+            "actions": f"output={out_p}",
+        }
+        arp_rev = base | {
+            "name": f"arp_rev_{idx}_{mac_dst}_{mac_src}",
+            "eth_type": "0x0806",
+            "in_port": out_p,
+            "actions": f"output={in_p}",
+        }
+
+        for flow in (fwd, rev, arp_fwd, arp_rev):
+            resp = requests.post(url, json=flow)
+            if resp.status_code == 200:
+                print(f"Flow {flow['name']} instalado en {dpid}")
+            else:
+                print(f"Error instalando {flow['name']} en {dpid}")
+
+def get_ipv4(controller_ip, mac):
+    """Devuelve la primera IP registrada para la MAC dada."""
+    url = f'http://{controller_ip}:8080/wm/device/'
+    r = requests.get(url)
+    if r.status_code == 200:
+        devices = r.json()
+        for device in devices:
+            if mac.lower() in [m.lower() for m in device.get('mac', [])]:
+                ips = device.get('ipv4', [])
+                if ips:
+                    return ips[0]
+    return None
             
 def calcular_ruta(alumno, servidor):
     """Obtiene la ruta actual entre un alumno y un servidor."""
@@ -133,13 +197,18 @@ def importar_yaml(ruta):
     alumnos_dict = {}
     if 'alumnos' in data:
         for a in data['alumnos']:
-            alumnos_dict[a['codigo']] = Alumno(a['nombre'], a['mac'], a['codigo'])
+            alumnos_dict[a['codigo']] = Alumno(
+                autoriz = a.get('autorizado', False)
+                a['nombre'],
+                a['codigo'],
+                a['mac'],
+                a.get('ip')
+            )
 
     servidores_dict = {}
     if 'servidores' in data:
         for s in data['servidores']:
-            srv = Servidor(s['nombre'], s['direccion_ip'])
-            srv.mac = s.get('mac', None)
+            srv = Servidor(s['nombre'], s['direccion_ip'], s.get('mac', None))
             for svc in s.get('servicios', []):
                 srv.agregar_servicio(Servicio(svc['nombre'], svc['protocolo'], svc['puerto']))
             servidores_dict[s['nombre']] = srv
@@ -165,79 +234,47 @@ def importar_yaml(ruta):
     print("Datos importados correctamente.")
     
 def submenu_cursos():
-
-    # ...dentro de tu opción "1. Crear" en submenu_conexiones:
-    curso_nom = input("Curso: ")
-    curso = next((c for c in cursos if c.nombre == curso_nom), None)
-    if not curso:
-        print("Curso no encontrado.")
-        continue
-    if curso.estado != "DICTANDO":
-        print("El curso no está activo.")
-        continue
-    # Selección del alumno
-    # ...
-    alumno = curso.alumnos[int(idx) - 1]
-    # Asegúrate que alumno esté en curso.alumnos (ya lo seleccionas de ahí, así que bien)
+    """Submenú para gestionar los cursos registrados."""
     
-    # Selección del servidor
-    # ...
-    servidor = curso.servidores[int(idx) - 1]
-    # Verifica que el servidor está en curso.servidores (también ok porque seleccionas de ahí)
-    
-    # Selección del servicio
-    # ...
-    servicio = servidor.servicios[int(idx) - 1]
-    # Ahora verifica si el servicio está en la lista de servicios permitidos del curso (si tu estructura los maneja así)
-    # Si tienes una lista tipo curso.servicios_permitidos o algo similar, comprueba aquí
-    
-    # Aquí podrías tener una función extra de autorización, pero en tu flujo, si seleccionas todo desde los objetos de curso,
-    # ya se cumple la mayor parte. Pero, SIEMPRE antes de crear la conexión, chequea TODO:
-    
-    if alumno not in curso.alumnos:
-        print("El alumno no está matriculado en este curso.")
-        continue
-    if servidor not in curso.servidores:
-        print("Servidor no permitido en este curso.")
-        continue
-    if servicio not in servidor.servicios:
-        print("Servicio no permitido en este servidor.")
-        continue
-    
-    # Solo aquí creas la conexión
-    handler = f"con{len(conexiones)+1}"
-    conexiones.append(Conexion(handler, alumno, servidor, servicio, ruta))
-    print(f"Conexión creada con handler {handler}")
-    
-    # Submenú para manejar las operaciones sobre cursos (Listar, Detalle, Actualizar)
     while True:
         print("1. Listar")
         print("2. Mostrar detalle")
         print("3. Actualizar")
         print("4. Volver")
         op = input("> ")
+        
         if op == "1":
-            if not cursos:    # Si la lista de cursos está vacía
+            if not cursos:    
                 print("No hay cursos registrados.")
             else:
-                for idx, c in enumerate(cursos, 1):    # Imprime la lista de cursos con índice
+                for idx, c in enumerate(cursos, 1): 
                     print(f"{idx}. {c.nombre} - {c.estado}")
+                    
         elif op == "2":
-            nombre = input("Nombre del curso: ")    # Pide el nombre del curso a mostrar
-            curso = next((c for c in cursos if c.nombre == nombre), None)    # Busca el curso por nombre
+            nombre = input("Nombre del curso: ")    
+            curso = next((c for c in cursos if c.nombre == nombre), None)    
             if curso:
                 print(f"Nombre: {curso.nombre}")
                 print(f"Estado: {curso.estado}")
+                
                 if curso.alumnos:
                     print("Alumnos:")
                     for a in curso.alumnos:
                         print(f"- {a.nombre} ({a.mac})")
                 else:
                     print("Sin alumnos")
+
+                if curso.servidores:
+                    print("Servidores:")
+                    for s in curso.servidores:
+                        print(f"- {s.nombre} ({s.direccion_ip})")
+                else:
+                    print("Sin servidores")
             else:
                 print("Curso no encontrado.")
+                
         elif op == "3":
-            nombre = input("Nombre del curso: ")    # Pide el nombre del curso a actualizar
+            nombre = input("Nombre del curso: ")    
             curso = next((c for c in cursos if c.nombre == nombre), None)
             if not curso:
                 print("Curso no encontrado.")
@@ -249,7 +286,6 @@ def submenu_cursos():
                 nom = input("Nombre del alumno: ")     # Pide datos para crear el alumno
                 mac = input("MAC del alumno: ")
                 codigo = input("Código del alumno (opcional): ")
-                # Agrega el alumno con código si se proporciona
                 if codigo == "":
                     codigo = None
                 curso.agregar_alumno(Alumno(nom, mac, codigo))
@@ -257,17 +293,18 @@ def submenu_cursos():
                 if not curso.alumnos:
                     print("No hay alumnos para eliminar.")
                 else:
-                    for i, a in enumerate(curso.alumnos, 1):    #Lista los alumnos para elegir
+                    for i, a in enumerate(curso.alumnos, 1):    
                         print(f"{i}. {a.nombre}")
-                    idx = input("Seleccione alumno: ")    # Pide el índice del alumno a borrar
+                    idx = input("Seleccione alumno: ")    
                     if idx.isdigit() and 1 <= int(idx) <= len(curso.alumnos):
-                        curso.remover_alumno(curso.alumnos[int(idx) - 1])    # Remueve al alumno
+                        curso.remover_alumno(curso.alumnos[int(idx) - 1])    
                     else:
                         print("Índice inválido.")
             else:
                 print("Opción inválida.")
+                
         elif op == "4":
-            break    # Sale del submenú de cursos
+            break    
         else:
             print("Opción inválida.")
 
@@ -424,7 +461,21 @@ def submenu_conexiones():
 
             # INSTALA LOS FLOWS EN LA RED (AMBOS SENTIDOS)
             proto_l4 = 6 if servicio.protocolo.upper() == "TCP" else 17
-            build_route(controller_ip, ruta, alumno.mac, "IP_DEL_ALUMNO", servidor.mac, servidor.direccion_ip, proto_l4, servicio.puerto)
+            ip_src = alumno.ip or get_ipv4(controller_ip, alumno.mac)
+            if not ip_src:
+                print("No se pudo determinar la IP del alumno.")
+                continue
+
+            build_route(
+                controller_ip,
+                ruta,
+                alumno.mac,
+                ip_src,
+                servidor.mac,
+                servidor.direccion_ip,
+                proto_l4,
+                servicio.puerto
+            )
 
             # CREA LA CONEXIÓN EN EL SISTEMA
             handler = f"con{len(conexiones)+1}"
