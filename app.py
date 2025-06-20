@@ -163,9 +163,6 @@ def importar_yaml(ruta):
                     curso.agregar_servidor(srv)
             cursos.append(curso)
     print("Datos importados correctamente.")
-
-def exportar_yaml(ruta):
-    pass
     
 def submenu_cursos():
 
@@ -359,9 +356,6 @@ def submenu_servidores():
         else:
             print("Opción inválida.")
 
-def submenu_politicas():
-    pass
-
 def submenu_conexiones():
     while True:
         print("1. Crear")
@@ -499,11 +493,11 @@ def submenu_conexiones():
 def menu():
     while True:
         print("1. Importar")
-        print("2. Exportar")
+        print("2. Exportar")    # <- SOLO OPCIÓN, no implementada
         print("3. Cursos")
         print("4. Alumnos")
         print("5. Servidores")
-        print("6. Políticas")
+        print("6. Políticas")    # <- SOLO OPCIÓN, no implementada
         print("7. Conexiones")
         print("8. Salir")
         op = input("> ")
@@ -511,7 +505,7 @@ def menu():
             ruta = input("Archivo YAML a importar: ")
             importar_yaml(ruta)
         elif op == "2":
-            exportar_yaml()
+            print("Función de exportar no implementada todavía.")
         elif op == "3":
             submenu_cursos()
         elif op == "4":
@@ -519,7 +513,7 @@ def menu():
         elif op == "5":
             submenu_servidores()
         elif op == "6":
-            submenu_politicas()
+            print("Módulo de políticas aún no implementado.")  
         elif op == "7":
             submenu_conexiones()
         elif op == "8":
