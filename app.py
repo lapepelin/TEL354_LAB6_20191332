@@ -67,30 +67,36 @@ controller_ip = "192.168.200.200"  # Dirección IP del controlador Floodlight
 def get_attachment_points(controller_ip, mac):
     # Obtiene el punto de attachment (switch y puerto) para un host por su MAC
     url = f'http://{controller_ip}:8080/wm/device/'    # Construye la URL de la API
-    r = requests.get(url)    # Hace el request GET a la API
-    if r.status_code == 200:    # Si la respuesta es exitosa
-        devices = r.json()    # Convierte la respuesta en JSON (lista de devices)
-        for device in devices:    # Recorre los dispositivos detectados
-            # La MAC puede venir como lista, compara en minúsculas
-            if mac.lower() in [m.lower() for m in device.get('mac', [])]:
-                # Algunos hosts pueden tener múltiples attachment points
-                for ap in device.get('attachmentPoint', []):
-                    dpid = ap.get('switchDPID')    # ID del switch al que está conectado el host
-                    port = ap.get('port')    # Puerto del switch al que está conectado
-                    return dpid, port    # Retorna el DPID y el puerto
-    return None, None # Si no se encuentra, devuelve None
+    try:
+        r = requests.get(url, timeout=5)    # Hace el request GET a la API con timeout
+        if r.status_code == 200:    # Si la respuesta es exitosa
+            devices = r.json()    # Convierte la respuesta en JSON (lista de devices)
+            for device in devices:    # Recorre los dispositivos detectados
+                # La MAC puede venir como lista, compara en minúsculas
+                if mac.lower() in [m.lower() for m in device.get('mac', [])]:
+                    # Algunos hosts pueden tener múltiples attachment points
+                    for ap in device.get('attachmentPoint', []):
+                        dpid = ap.get('switchDPID')    # ID del switch al que está conectado el host
+                        port = ap.get('port')    # Puerto del switch al que está conectado
+                        return dpid, port    # Retorna el DPID y el puerto
+    except requests.RequestException as exc:
+        print(f"Error consultando el controlador: {exc}")
+    return None, None # Si no se encuentra, devuelve None o hay error
 
 def get_route(controller_ip, src_dpid, src_port, dst_dpid, dst_port):
     # Obtiene la ruta (lista de switches y puertos) entre dos puntos de la red
     url = f'http://{controller_ip}:8080/wm/topology/route/{src_dpid}/{src_port}/{dst_dpid}/{dst_port}/json'
-    r = requests.get(url)    # Hace el request GET a la API
-    if r.status_code == 200:
-        # La respuesta es una lista de hops (cada hop: switch, puerto)
-        route = r.json()   
-        # lista de (dpid, puerto)
-        hops = [(str(hop['switch']), hop['port']) for hop in route]    # Arma una lista de tuplas (dpid, puerto)
-        return hops    # Retorna la lista de saltos
-    return []    # Si falla, retorna lista vacía
+    try:
+        r = requests.get(url, timeout=5)    # Hace el request GET a la API con timeout
+        if r.status_code == 200:
+            # La respuesta es una lista de hops (cada hop: switch, puerto)
+            route = r.json()
+            # lista de (dpid, puerto)
+            hops = [(str(hop['switch']), hop['port']) for hop in route]    # Arma una lista de tuplas (dpid, puerto)
+            return hops    # Retorna la lista de saltos
+    except requests.RequestException as exc:
+        print(f"Error consultando el controlador: {exc}")
+    return []    # Si falla o hay error, retorna lista vacía
 
 def build_route(controller_ip, ruta, port_src, port_dst, mac_src, ip_src, mac_dst,
                 ip_dst, proto_l4, l4_src, l4_dst):
